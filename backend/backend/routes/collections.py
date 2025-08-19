@@ -173,3 +173,62 @@ def remove_companies_from_liked_collection(
     db.commit()
     
     return {"message": f"Removed {deleted_count} companies from liked collection"}
+
+
+def get_my_list_collection_id(db: Session) -> uuid.UUID:
+    """Get the ID of the 'My List' collection"""
+    my_list_collection = (
+        db.query(database.CompanyCollection)
+        .filter(database.CompanyCollection.collection_name == "My List")
+        .first()
+    )
+    
+    if not my_list_collection:
+        raise HTTPException(status_code=404, detail="My List not found")
+    
+    return my_list_collection.id
+
+
+@router.post("/add-my-list")
+def add_companies_to_my_list(
+    request: AddCompaniesRequest,
+    db: Session = Depends(database.get_db),
+):
+    my_list_collection_id = get_my_list_collection_id(db)
+    
+    # Check which companies are already in the my list collection
+    existing_associations = (
+        db.query(database.CompanyCollectionAssociation.company_id)
+        .filter(
+            database.CompanyCollectionAssociation.collection_id == my_list_collection_id,
+            database.CompanyCollectionAssociation.company_id.in_(request.company_ids)
+        )
+        .all()
+    )
+    existing_company_ids = {assoc[0] for assoc in existing_associations}
+    
+    # Only add companies that aren't already in the collection
+    new_company_ids = [cid for cid in request.company_ids if cid not in existing_company_ids]
+    
+    if not new_company_ids:
+        return {"message": f"All {len(request.company_ids)} companies are already in My List"}
+    
+    # Create associations for new companies only
+    new_associations = []
+    for company_id in new_company_ids:
+        new_associations.append(
+            database.CompanyCollectionAssociation(
+                company_id=company_id,
+                collection_id=my_list_collection_id
+            )
+        )
+    
+    # Add new associations to database
+    db.bulk_save_objects(new_associations)
+    db.commit()
+    
+    skipped_count = len(request.company_ids) - len(new_company_ids)
+    if skipped_count > 0:
+        return {"message": f"Added {len(new_company_ids)} companies to My List, {skipped_count} were already present"}
+    else:
+        return {"message": f"Added {len(new_company_ids)} companies to My List"}

@@ -1,7 +1,7 @@
 import { DataGrid } from "@mui/x-data-grid";
 import { Button, LinearProgress, Box, Typography, Alert } from "@mui/material";
 import { useEffect, useState } from "react";
-import { getCollectionsById, ICompany, addCompaniesToLikedCollection, removeCompaniesFromLikedCollection, getLikedCollectionId, getCollectionCompanyIds } from "../utils/jam-api";
+import { getCollectionsById, ICompany, addCompaniesToLikedCollection, removeCompaniesFromLikedCollection, getLikedCollectionId, getCollectionCompanyIds, addCompaniesToMyList } from "../utils/jam-api";
 
 const CompanyTable = (props: { selectedCollectionId: string }) => {
   const [response, setResponse] = useState<ICompany[]>([]);
@@ -135,6 +135,53 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
     }
   };
 
+  const handleAddToMyList = async () => {
+    if (selectedRows.length === 0) return;
+    
+    const companyIds = selectedRows.map(id => parseInt(id));
+    const count = companyIds.length;
+    
+    setIsLoading(true);
+    setShowCompleted(false);
+    setIsCancelled(false);
+    setOperationType("add");
+    setOperationCount(count);
+    setStartTime(Date.now());
+    setElapsedTime(0);
+    
+    try {
+      // Add companies to My List
+      await addCompaniesToMyList(companyIds);
+      
+      // Check if operation was cancelled
+      if (isCancelled) {
+        console.log('Operation was cancelled, not completing');
+        return;
+      }
+      
+      console.log(`Successfully added ${count} companies to My List`);
+
+      // Clear selection
+      setSelectedRows([]);
+      
+      // Trigger refresh
+      setRefreshTrigger(prev => prev + 1);
+      
+      // Show completed state briefly
+      setIsLoading(false);
+      setShowCompleted(true);
+      setOperationType(null);
+      setStartTime(null);
+      setTimeout(() => setShowCompleted(false), 2000);
+      
+    } catch (error) {
+      console.error("Failed to add companies to My List:", error);
+      setIsLoading(false);
+      setOperationType(null);
+      setStartTime(null);
+    }
+  };
+
   const handleSelectAll = async () => {
     try {
       // Fetch only company IDs using the lightweight endpoint
@@ -208,17 +255,17 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
 
   return (
     <div>
-      {/* Time estimate warning for large selections - only for add operations */}
-      {selectedRows.length > 0 && !isLoading && !isLikedCollection && (
+      {/* Time estimate warning for large selections - for all add operations */}
+      {selectedRows.length > 0 && !isLoading && (
         <Alert severity="info" sx={{ mb: 2 }}>
           <Typography variant="body2">
             You've selected {selectedRows.length} companies. 
-            This operation will take approximately {formatTime(selectedRows.length * MS_PER_ITEM)} to complete.
+            The add operation will take approximately {formatTime(selectedRows.length * MS_PER_ITEM)} to complete.
           </Typography>
         </Alert>
       )}
 
-      {/* Progress bar with detailed feedback - only for add operations */}
+      {/* Progress bar with detailed feedback - for all add operations */}
       {(isLoading || showCompleted) && operationType === "add" && (
         <Box sx={{ width: '100%', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -301,14 +348,24 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
         {selectedRows.length > 0 && (
           <>
             {isLikedCollection ? (
-              <Button 
-                variant="contained" 
-                color="error"
-                onClick={handleRemoveFromLiked}
-                disabled={isLoading}
-              >
-                Remove From Liked ({selectedRows.length})
-              </Button>
+              <>
+                <Button 
+                  variant="contained" 
+                  color="error"
+                  onClick={handleRemoveFromLiked}
+                  disabled={isLoading}
+                >
+                  Remove From Liked ({selectedRows.length})
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="secondary"
+                  onClick={handleAddToMyList}
+                  disabled={isLoading}
+                >
+                  Add to My List ({selectedRows.length})
+                </Button>
+              </>
             ) : (
               <Button 
                 variant="contained" 
@@ -340,6 +397,7 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
           pagination
           checkboxSelection
           paginationMode="server"
+          rowSelectionModel={selectedRows}
           onRowSelectionModelChange={(newSelection) => {
             setSelectedRows(newSelection as string[]);
           }}

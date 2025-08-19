@@ -103,3 +103,15 @@ export async function getCollectionCompanyIds(collectionId: string): Promise<num
     }
 }
 
+export async function addCompaniesToMyList(companyIds: number[]): Promise<void> {
+    try {
+        const response = await axios.post(`${BASE_URL}/collections/add-my-list`, {
+            company_ids: companyIds
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error adding companies to My List:', error);
+        throw error;
+    }
+}
+
