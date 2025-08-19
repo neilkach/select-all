@@ -1,15 +1,14 @@
 import uuid
+from typing import List
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.db import database
-from backend.routes.companies import (
-    CompanyBatchOutput,
-    fetch_companies_with_liked,
-)
+from backend.routes.companies import (CompanyBatchOutput,
+                                      fetch_companies_with_liked)
 
 router = APIRouter(
     prefix="/collections",
@@ -69,3 +68,38 @@ def get_company_collection_by_id(
         companies=companies,
         total=total_count,
     )
+
+
+class AddCompaniesRequest(BaseModel):
+    company_ids: List[int]
+
+@router.post("/add-liked")
+def add_companies_to_liked_collection(
+    request: AddCompaniesRequest,
+    db: Session = Depends(database.get_db),
+):
+    # Find the "Liked Companies List" collection
+    liked_collection = (
+        db.query(database.CompanyCollection)
+        .filter(database.CompanyCollection.collection_name == "Liked Companies List")
+        .first()
+    )
+    
+    if not liked_collection:
+        raise HTTPException(status_code=404, detail="Liked Companies List not found")
+    
+    # Create associations for all requested companies
+    new_associations = []
+    for company_id in request.company_ids:
+        new_associations.append(
+            database.CompanyCollectionAssociation(
+                company_id=company_id,
+                collection_id=liked_collection.id
+            )
+        )
+    
+    # Add to database (SQLAlchemy will handle duplicates with the unique constraint)
+    db.bulk_save_objects(new_associations)
+    db.commit()
+    
+    return {"message": f"Added {len(request.company_ids)} companies to liked collection"}
