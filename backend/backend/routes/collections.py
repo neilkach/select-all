@@ -59,6 +59,19 @@ def get_all_collection_metadata(
         )
         for collection in collections
     ]
+    
+@router.get("/{collection_id}/company-ids")
+def get_collection_company_ids(
+    collection_id: uuid.UUID,
+    db: Session = Depends(database.get_db),
+):
+    """Get only the company IDs for a collection (lightweight endpoint for select all)"""
+    company_ids = (
+        db.query(database.CompanyCollectionAssociation.company_id)
+        .filter(database.CompanyCollectionAssociation.collection_id == collection_id)
+        .all()
+    )
+    return {"company_ids": [id[0] for id in company_ids]}
 
 
 @router.get("/{collection_id}", response_model=CompanyCollectionOutput)
@@ -102,9 +115,26 @@ def add_companies_to_liked_collection(
 ):
     liked_collection_id = get_liked_collection_id(db)
     
-    # Create associations for all requested companies
+    # Check which companies are already in the liked collection
+    existing_associations = (
+        db.query(database.CompanyCollectionAssociation.company_id)
+        .filter(
+            database.CompanyCollectionAssociation.collection_id == liked_collection_id,
+            database.CompanyCollectionAssociation.company_id.in_(request.company_ids)
+        )
+        .all()
+    )
+    existing_company_ids = {assoc[0] for assoc in existing_associations}
+    
+    # Only add companies that aren't already in the collection
+    new_company_ids = [cid for cid in request.company_ids if cid not in existing_company_ids]
+    
+    if not new_company_ids:
+        return {"message": f"All {len(request.company_ids)} companies are already in the liked collection"}
+    
+    # Create associations for new companies only
     new_associations = []
-    for company_id in request.company_ids:
+    for company_id in new_company_ids:
         new_associations.append(
             database.CompanyCollectionAssociation(
                 company_id=company_id,
@@ -112,11 +142,15 @@ def add_companies_to_liked_collection(
             )
         )
     
-    # Add to database (SQLAlchemy will handle duplicates with the unique constraint)
+    # Add new associations to database
     db.bulk_save_objects(new_associations)
     db.commit()
     
-    return {"message": f"Added {len(request.company_ids)} companies to liked collection"}
+    skipped_count = len(request.company_ids) - len(new_company_ids)
+    if skipped_count > 0:
+        return {"message": f"Added {len(new_company_ids)} companies to liked collection, {skipped_count} were already present"}
+    else:
+        return {"message": f"Added {len(new_company_ids)} companies to liked collection"}
 
 
 @router.post("/remove-liked")

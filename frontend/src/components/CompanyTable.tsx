@@ -1,7 +1,7 @@
 import { DataGrid } from "@mui/x-data-grid";
 import { Button, LinearProgress, Box, Typography, Alert } from "@mui/material";
 import { useEffect, useState } from "react";
-import { getCollectionsById, ICompany, addCompaniesToLikedCollection, removeCompaniesFromLikedCollection, getLikedCollectionId } from "../utils/jam-api";
+import { getCollectionsById, ICompany, addCompaniesToLikedCollection, removeCompaniesFromLikedCollection, getLikedCollectionId, getCollectionCompanyIds } from "../utils/jam-api";
 
 const CompanyTable = (props: { selectedCollectionId: string }) => {
   const [response, setResponse] = useState<ICompany[]>([]);
@@ -127,6 +127,29 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
     }
   };
 
+  const handleSelectAll = async () => {
+    try {
+      // Fetch only company IDs using the lightweight endpoint
+      const companyIds = await getCollectionCompanyIds(props.selectedCollectionId);
+      
+      // Convert to string array to match the selectedRows state type
+      const allCompanyIdStrings = companyIds.map(id => id.toString());
+      
+      // Set selected rows to all companies
+      setSelectedRows(allCompanyIdStrings);
+      
+      console.log(`Selected all ${companyIds.length} companies from collection`);
+    } catch (error) {
+      console.error('Failed to select all companies:', error);
+      // You might want to show an error message to the user here
+    }
+  };
+
+  const handleClearSelections = () => {
+    setSelectedRows([]);
+    console.log('Cleared all selections');
+  };
+
   const handleRemoveFromLiked = async () => {
     if (selectedRows.length === 0) return;
     
@@ -226,29 +249,49 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
         </Box>
       )}
       
-      {selectedRows.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          {isLikedCollection ? (
-            <Button 
-              variant="contained" 
-              color="error"
-              onClick={handleRemoveFromLiked}
-              disabled={isLoading}
-            >
-              Remove From Liked ({selectedRows.length})
-            </Button>
-          ) : (
-            <Button 
-              variant="contained" 
-              color="primary"
-              onClick={handleAddToLiked}
-              disabled={isLoading}
-            >
-              Add to Liked ({selectedRows.length})
-            </Button>
-          )}
-        </div>
-      )}
+      <div style={{ marginBottom: 16, display: 'flex', gap: 2, alignItems: 'center' }}>
+        {selectedRows.length === 0 ? (
+          <Button 
+            variant="outlined"
+            onClick={handleSelectAll}
+            disabled={isLoading}
+          >
+            Select All ({total || 0})
+          </Button>
+        ) : (
+          <Button 
+            variant="outlined"
+            onClick={handleClearSelections}
+            disabled={isLoading}
+          >
+            Clear Selections
+          </Button>
+        )}
+        
+        {selectedRows.length > 0 && (
+          <>
+            {isLikedCollection ? (
+              <Button 
+                variant="contained" 
+                color="error"
+                onClick={handleRemoveFromLiked}
+                disabled={isLoading}
+              >
+                Remove From Liked ({selectedRows.length})
+              </Button>
+            ) : (
+              <Button 
+                variant="contained" 
+                color="primary"
+                onClick={handleAddToLiked}
+                disabled={isLoading}
+              >
+                Add to Liked ({selectedRows.length})
+              </Button>
+            )}
+          </>
+        )}
+      </div>
       <div style={{ height: 600, width: "100%" }}>
         <DataGrid
           rows={response}

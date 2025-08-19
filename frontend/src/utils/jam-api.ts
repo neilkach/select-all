@@ -92,3 +92,14 @@ export async function getLikedCollectionId(): Promise<string> {
         throw error;
     }
 }
+
+export async function getCollectionCompanyIds(collectionId: string): Promise<number[]> {
+    try {
+        const response = await axios.get(`${BASE_URL}/collections/${collectionId}/company-ids`);
+        return response.data.company_ids;
+    } catch (error) {
+        console.error('Error fetching collection company IDs:', error);
+        throw error;
+    }
+}
+
