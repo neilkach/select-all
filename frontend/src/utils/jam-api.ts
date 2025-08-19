@@ -70,3 +70,25 @@ export async function addCompaniesToLikedCollection(companyIds: number[]): Promi
         throw error;
     }
 }
+
+export async function removeCompaniesFromLikedCollection(companyIds: number[]): Promise<void> {
+    try {
+        const response = await axios.post(`${BASE_URL}/collections/remove-liked`, {
+            company_ids: companyIds
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error removing companies from liked collection:', error);
+        throw error;
+    }
+}
+
+export async function getLikedCollectionId(): Promise<string> {
+    try {
+        const response = await axios.get(`${BASE_URL}/collections/liked-id`);
+        return response.data.id;
+    } catch (error) {
+        console.error('Error fetching liked collection ID:', error);
+        throw error;
+    }
+}

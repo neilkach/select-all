@@ -1,7 +1,7 @@
 import { DataGrid } from "@mui/x-data-grid";
 import { Button } from "@mui/material";
 import { useEffect, useState } from "react";
-import { getCollectionsById, ICompany, addCompaniesToLikedCollection } from "../utils/jam-api";
+import { getCollectionsById, ICompany, addCompaniesToLikedCollection, removeCompaniesFromLikedCollection, getLikedCollectionId } from "../utils/jam-api";
 
 const CompanyTable = (props: { selectedCollectionId: string }) => {
   const [response, setResponse] = useState<ICompany[]>([]);
@@ -10,6 +10,16 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
   const [pageSize, setPageSize] = useState(25);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [likedCollectionId, setLikedCollectionId] = useState<string>("");
+
+  useEffect(() => {
+    // Get the liked collection ID once on component mount
+    getLikedCollectionId()
+      .then(setLikedCollectionId)
+      .catch(error => {
+        console.error("Failed to get liked collection ID:", error);
+      });
+  }, []);
 
   useEffect(() => {
     getCollectionsById(props.selectedCollectionId, offset, pageSize).then(
@@ -47,17 +57,52 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
     }
   };
 
+  const handleRemoveFromLiked = async () => {
+    if (selectedRows.length === 0) return;
+    
+    try {
+      // Convert selected row IDs to numbers
+      const companyIds = selectedRows.map(id => parseInt(id));
+      
+      // Remove companies from the liked collection
+      await removeCompaniesFromLikedCollection(companyIds);
+      
+      console.log(`Successfully removed ${companyIds.length} companies from liked collection`);
+
+      // Clear selection
+      setSelectedRows([]);
+      
+      // Trigger refresh
+      setRefreshTrigger(prev => prev + 1);
+      
+    } catch (error) {
+      console.error("Failed to remove companies from liked collection:", error);
+    }
+  };
+
+  const isLikedCollection = props.selectedCollectionId === likedCollectionId;
+
   return (
     <div>
       {selectedRows.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <Button 
-            variant="contained" 
-            color="primary"
-            onClick={handleAddToLiked}
-          >
-            Add to Liked ({selectedRows.length})
-          </Button>
+          {isLikedCollection ? (
+            <Button 
+              variant="contained" 
+              color="error"
+              onClick={handleRemoveFromLiked}
+            >
+              Remove From Liked ({selectedRows.length})
+            </Button>
+          ) : (
+            <Button 
+              variant="contained" 
+              color="primary"
+              onClick={handleAddToLiked}
+            >
+              Add to Liked ({selectedRows.length})
+            </Button>
+          )}
         </div>
       )}
       <div style={{ height: 600, width: "100%" }}>

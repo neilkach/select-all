@@ -15,6 +15,27 @@ router = APIRouter(
     tags=["collections"],
 )
 
+def get_liked_collection_id(db: Session) -> uuid.UUID:
+    """Get the ID of the 'Liked Companies List' collection"""
+    liked_collection = (
+        db.query(database.CompanyCollection)
+        .filter(database.CompanyCollection.collection_name == "Liked Companies List")
+        .first()
+    )
+    
+    if not liked_collection:
+        raise HTTPException(status_code=404, detail="Liked Companies List not found")
+    
+    return liked_collection.id
+
+
+@router.get("/liked-id")
+def get_liked_collection_id_endpoint(db: Session = Depends(database.get_db)):
+    """Endpoint to get the liked collection ID for frontend comparison"""
+    liked_collection_id = get_liked_collection_id(db)
+    print(liked_collection_id)
+    return {"id": str(liked_collection_id)}
+
 
 class CompanyCollectionMetadata(BaseModel):
     id: uuid.UUID
@@ -73,20 +94,13 @@ def get_company_collection_by_id(
 class AddCompaniesRequest(BaseModel):
     company_ids: List[int]
 
+
 @router.post("/add-liked")
 def add_companies_to_liked_collection(
     request: AddCompaniesRequest,
     db: Session = Depends(database.get_db),
 ):
-    # Find the "Liked Companies List" collection
-    liked_collection = (
-        db.query(database.CompanyCollection)
-        .filter(database.CompanyCollection.collection_name == "Liked Companies List")
-        .first()
-    )
-    
-    if not liked_collection:
-        raise HTTPException(status_code=404, detail="Liked Companies List not found")
+    liked_collection_id = get_liked_collection_id(db)
     
     # Create associations for all requested companies
     new_associations = []
@@ -94,7 +108,7 @@ def add_companies_to_liked_collection(
         new_associations.append(
             database.CompanyCollectionAssociation(
                 company_id=company_id,
-                collection_id=liked_collection.id
+                collection_id=liked_collection_id
             )
         )
     
@@ -103,3 +117,25 @@ def add_companies_to_liked_collection(
     db.commit()
     
     return {"message": f"Added {len(request.company_ids)} companies to liked collection"}
+
+
+@router.post("/remove-liked")
+def remove_companies_from_liked_collection(
+    request: AddCompaniesRequest,
+    db: Session = Depends(database.get_db),
+):
+    liked_collection_id = get_liked_collection_id(db)
+    
+    # Remove associations for all requested companies
+    deleted_count = (
+        db.query(database.CompanyCollectionAssociation)
+        .filter(
+            database.CompanyCollectionAssociation.collection_id == liked_collection_id,
+            database.CompanyCollectionAssociation.company_id.in_(request.company_ids)
+        )
+        .delete(synchronize_session=False)
+    )
+    
+    db.commit()
+    
+    return {"message": f"Removed {deleted_count} companies from liked collection"}
