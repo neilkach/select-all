@@ -17,6 +17,7 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
   const [operationCount, setOperationCount] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [isCancelled, setIsCancelled] = useState(false);
 
   // Constants for time estimation (based on 100ms per item database delay)
   const MS_PER_ITEM = 100;
@@ -95,6 +96,7 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
     
     setIsLoading(true);
     setShowCompleted(false);
+    setIsCancelled(false);
     setOperationType("add");
     setOperationCount(count);
     setStartTime(Date.now());
@@ -103,6 +105,12 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
     try {
       // Add companies to the liked collection
       await addCompaniesToLikedCollection(companyIds);
+      
+      // Check if operation was cancelled
+      if (isCancelled) {
+        console.log('Operation was cancelled, not completing');
+        return;
+      }
       
       console.log(`Successfully added ${count} companies to liked collection`);
 
@@ -148,6 +156,15 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
   const handleClearSelections = () => {
     setSelectedRows([]);
     console.log('Cleared all selections');
+  };
+
+  const handleCancelOperation = () => {
+    setIsCancelled(true);
+    setIsLoading(false);
+    setOperationType(null);
+    setStartTime(null);
+    setElapsedTime(0);
+    console.log('Operation cancelled by user');
   };
 
   const handleRemoveFromLiked = async () => {
@@ -228,11 +245,24 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
               }
             </Typography>
             
-            {isLoading && (
-              <Typography variant="body2" color="text.secondary">
-                {getEstimatedTimeRemaining()} remaining
-              </Typography>
-            )}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {isLoading && (
+                <Typography variant="body2" color="text.secondary">
+                  {getEstimatedTimeRemaining()} remaining
+                </Typography>
+              )}
+              
+              {isLoading && (
+                <Button 
+                  variant="outlined" 
+                  color="error" 
+                  size="small"
+                  onClick={handleCancelOperation}
+                >
+                  Cancel
+                </Button>
+              )}
+            </Box>
           </Box>
         </Box>
       )}
