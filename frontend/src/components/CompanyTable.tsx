@@ -413,12 +413,27 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
           paginationMode="server"
           rowSelectionModel={getCurrentSelections()}
           onRowSelectionModelChange={(newSelection) => {
-            updateCurrentSelections(newSelection as string[]);
+            const currentSelections = getCurrentSelections();
+            const newSelectionArray = newSelection as string[];
+            
+            // Get the IDs of rows that are currently visible on this page
+            const currentPageIds = response.map(row => row.id.toString());
+            
+            // Remove selections for rows that are no longer on this page
+            const selectionsToKeep = currentSelections.filter(id => !currentPageIds.includes(id));
+            
+            // Add the new selections from this page
+            const updatedSelections = [...selectionsToKeep, ...newSelectionArray];
+            
+            updateCurrentSelections(updatedSelections);
           }}
           onPaginationModelChange={(newMeta) => {
             setPageSize(newMeta.pageSize);
             setOffset(newMeta.page * newMeta.pageSize);
           }}
+          isRowSelectable={(params) => true}
+          disableRowSelectionOnClick
+          keepNonExistentRowsSelected
         />
       </div>
     </div>
