@@ -8,7 +8,8 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
   const [total, setTotal] = useState<number>();
   const [offset, setOffset] = useState<number>(0);
   const [pageSize, setPageSize] = useState(25);
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  // Change from simple array to object mapping collection ID to selected rows
+  const [selectionsByCollection, setSelectionsByCollection] = useState<Record<string, string[]>>({});
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [likedCollectionId, setLikedCollectionId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
@@ -18,6 +19,19 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isCancelled, setIsCancelled] = useState(false);
+
+  // Helper function to get current selections for the active collection
+  const getCurrentSelections = (): string[] => {
+    return selectionsByCollection[props.selectedCollectionId] || [];
+  };
+
+  // Helper function to update selections for the current collection
+  const updateCurrentSelections = (newSelections: string[]) => {
+    setSelectionsByCollection(prev => ({
+      ...prev,
+      [props.selectedCollectionId]: newSelections
+    }));
+  };
 
   // Constants for time estimation (based on 100ms per item database delay)
   const MS_PER_ITEM = 100;
@@ -89,9 +103,9 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
   };
 
   const handleAddToLiked = async () => {
-    if (selectedRows.length === 0) return;
+    if (getCurrentSelections().length === 0) return;
     
-    const companyIds = selectedRows.map(id => parseInt(id));
+    const companyIds = getCurrentSelections().map(id => parseInt(id));
     const count = companyIds.length;
     
     setIsLoading(true);
@@ -115,7 +129,7 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
       console.log(`Successfully added ${count} companies to liked collection`);
 
       // Clear selection
-      setSelectedRows([]);
+      updateCurrentSelections([]);
       
       // Trigger refresh
       setRefreshTrigger(prev => prev + 1);
@@ -136,9 +150,9 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
   };
 
   const handleAddToMyList = async () => {
-    if (selectedRows.length === 0) return;
+    if (getCurrentSelections().length === 0) return;
     
-    const companyIds = selectedRows.map(id => parseInt(id));
+    const companyIds = getCurrentSelections().map(id => parseInt(id));
     const count = companyIds.length;
     
     setIsLoading(true);
@@ -162,7 +176,7 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
       console.log(`Successfully added ${count} companies to My List`);
 
       // Clear selection
-      setSelectedRows([]);
+      updateCurrentSelections([]);
       
       // Trigger refresh
       setRefreshTrigger(prev => prev + 1);
@@ -191,7 +205,7 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
       const allCompanyIdStrings = companyIds.map(id => id.toString());
       
       // Set selected rows to all companies
-      setSelectedRows(allCompanyIdStrings);
+      updateCurrentSelections(allCompanyIdStrings);
       
       console.log(`Selected all ${companyIds.length} companies from collection`);
     } catch (error) {
@@ -201,7 +215,7 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
   };
 
   const handleClearSelections = () => {
-    setSelectedRows([]);
+    updateCurrentSelections([]);
     console.log('Cleared all selections');
   };
 
@@ -215,9 +229,9 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
   };
 
   const handleRemoveFromLiked = async () => {
-    if (selectedRows.length === 0) return;
+    if (getCurrentSelections().length === 0) return;
     
-    const companyIds = selectedRows.map(id => parseInt(id));
+    const companyIds = getCurrentSelections().map(id => parseInt(id));
     const count = companyIds.length;
     
     setIsLoading(true);
@@ -233,7 +247,7 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
       console.log(`Successfully removed ${count} companies from liked collection`);
 
       // Clear selection
-      setSelectedRows([]);
+      updateCurrentSelections([]);
       
       // Trigger refresh
       setRefreshTrigger(prev => prev + 1);
@@ -256,11 +270,11 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
   return (
     <div>
       {/* Time estimate warning for large selections - for all add operations */}
-      {selectedRows.length > 0 && !isLoading && (
+      {getCurrentSelections().length > 0 && !isLoading && (
         <Alert severity="info" sx={{ mb: 2 }}>
           <Typography variant="body2">
-            You've selected {selectedRows.length} companies. 
-            The add operation will take approximately {formatTime(selectedRows.length * MS_PER_ITEM)} to complete.
+            You've selected {getCurrentSelections().length} companies. 
+            The add operation will take approximately {formatTime(getCurrentSelections().length * MS_PER_ITEM)} to complete.
           </Typography>
         </Alert>
       )}
@@ -327,7 +341,7 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
       )}
       
       <div style={{ marginBottom: 16, display: 'flex', gap: 2, alignItems: 'center' }}>
-        {selectedRows.length === 0 ? (
+        {getCurrentSelections().length === 0 ? (
           <Button 
             variant="outlined"
             onClick={handleSelectAll}
@@ -345,7 +359,7 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
           </Button>
         )}
         
-        {selectedRows.length > 0 && (
+        {getCurrentSelections().length > 0 && (
           <>
             {isLikedCollection ? (
               <>
@@ -355,7 +369,7 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
                   onClick={handleRemoveFromLiked}
                   disabled={isLoading}
                 >
-                  Remove From Liked ({selectedRows.length})
+                  Remove From Liked ({getCurrentSelections().length})
                 </Button>
                 <Button 
                   variant="contained" 
@@ -363,7 +377,7 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
                   onClick={handleAddToMyList}
                   disabled={isLoading}
                 >
-                  Add to My List ({selectedRows.length})
+                  Add to My List ({getCurrentSelections().length})
                 </Button>
               </>
             ) : (
@@ -373,7 +387,7 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
                 onClick={handleAddToLiked}
                 disabled={isLoading}
               >
-                Add to Liked ({selectedRows.length})
+                Add to Liked ({getCurrentSelections().length})
               </Button>
             )}
           </>
@@ -397,9 +411,9 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
           pagination
           checkboxSelection
           paginationMode="server"
-          rowSelectionModel={selectedRows}
+          rowSelectionModel={getCurrentSelections()}
           onRowSelectionModelChange={(newSelection) => {
-            setSelectedRows(newSelection as string[]);
+            updateCurrentSelections(newSelection as string[]);
           }}
           onPaginationModelChange={(newMeta) => {
             setPageSize(newMeta.pageSize);
